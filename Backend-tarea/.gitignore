@@ -1,0 +1,24 @@
+# Configuración con credenciales reales
+/config.php
+
+# Dependencias de Composer
+/vendor/
+
+# Logs del sistema
+/api/logs/*.log
+!/api/logs/.gitkeep
+
+# Archivos subidos por usuarios
+/api/uploads/adjuntos/*
+!/api/uploads/adjuntos/.gitkeep
+
+# Sistema operativo
+.DS_Store
+Thumbs.db
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
