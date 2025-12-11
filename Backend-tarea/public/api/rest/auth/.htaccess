@@ -1,5 +1,10 @@
 RewriteEngine On
+# IMPORTANTE: La base debe terminar en /auth/
 RewriteBase /app-tarea/Backend-tarea/public/api/rest/auth/
+
+# Si el archivo o carpeta existe, no reescribir (esto permite cargar el index.php)
 RewriteCond %{REQUEST_FILENAME} !-f
 RewriteCond %{REQUEST_FILENAME} !-d
+
+# Mandar todo lo demás a index.php
 RewriteRule ^ index.php [QSA,L]

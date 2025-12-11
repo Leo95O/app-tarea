@@ -3,166 +3,117 @@ namespace Api\Controllers;
 
 use Api\Core\Response;
 use Api\Core\JWTHelper;
-use Api\Validators\AuthValidator;
 use Api\Repositories\AuthRepository;
+use Api\Validators\AuthValidator;
 use Slim\Slim;
 
 /**
  * Controlador de Autenticación
- *
- * Orquesta el flujo de login:
- * 1. Valida formato de credenciales
- * 2. Verifica bloqueo por intentos fallidos
- * 3. Busca usuario en BD
- * 4. Verifica contraseña
- * 5. Genera token JWT
- * 6. Registra auditoría
+ * Responsabilidad: Orquestar Login, Bloqueos de Seguridad y Emisión de Tokens.
  */
 class AuthController {
 
-    private $authRepository;
+    private $repo;
+    private $validator;
 
-    /**
-     * Constructor
-     */
     public function __construct() {
-        $this->authRepository = new AuthRepository();
+        // Instanciamos las dependencias actualizadas
+        $this->repo = new AuthRepository();
+        $this->validator = new AuthValidator();
     }
 
     /**
-     * Login de usuario
-     *
-     * Endpoint: POST /auth/login
-     *
-     * @param Slim $app Instancia de Slim
+     * POST / - Iniciar Sesión
      */
     public function login(Slim $app) {
         try {
-            // 1. Obtener datos del request
-            $datos = json_decode($app->request()->getBody(), true);
-            $email = $datos['email'] ?? '';
-            $password = $datos['password'] ?? '';
-            $ip_origen = $this->obtenerIPCliente();
+            // 1. Obtener datos
+            $req = json_decode($app->request()->getBody(), true);
+            $ip = $app->request()->getIp(); // Slim obtiene la IP correctamente
 
-            // 2. Validar formato de credenciales
-            $validacion = AuthValidator::validarCredenciales($email, $password);
+            // 2. Validación de Formato (Usando instancia, no estático)
+            $validacion = $this->validator->validarLogin($req);
             if (!$validacion['valido']) {
-                $respuesta = Response::advertencia($validacion['errores']);
-                Response::enviar($app, $respuesta, 400);
-                return;
+                return Response::enviar($app, Response::advertencia("Datos incompletos", $validacion['errores']), 400);
             }
 
-            // 3. Verificar bloqueo por intentos fallidos
-            $bloqueo = $this->authRepository->verificarBloqueo($email, $ip_origen);
-            if ($bloqueo['bloqueado']) {
-                $tiempo_minutos = ceil($bloqueo['tiempo_restante'] / 60);
-                $mensaje = "Cuenta temporalmente bloqueada por múltiples intentos fallidos. " .
-                          "Intente nuevamente en {$tiempo_minutos} minuto(s).";
-
-                $this->authRepository->registrarAuditoria(null, 'BLOQUEO_CUENTA', "Email: {$email}, IP: {$ip_origen}");
-
-                $respuesta = Response::advertencia($mensaje);
-                Response::enviar($app, $respuesta, 429); // 429 Too Many Requests
-                return;
+            // 3. Verificar Bloqueo (Anti-Fuerza Bruta)
+            // NOTA: El método en el repo nuevo se llama 'estaBloqueado'
+            if ($this->repo->estaBloqueado($ip)) {
+                // Registrar auditoría del bloqueo
+                $this->repo->auditar(null, 'BLOQUEO_ACTIVO', $ip);
+                return Response::enviar($app, Response::advertencia("Demasiados intentos fallidos. Espere 2 minutos."), 429);
             }
 
-            // 4. Buscar usuario por email
-            $usuario = $this->authRepository->buscarPorEmail($email);
+            // 4. Buscar Usuario (El método nuevo es 'obtenerPorEmail')
+            $usuario = $this->repo->obtenerPorEmail($req['email']);
 
-            if (!$usuario) {
-                // Usuario no existe - Registrar intento fallido sin dar pistas
-                $this->authRepository->registrarIntentoFallido($email, $ip_origen);
-                $this->authRepository->registrarAuditoria(null, 'LOGIN_FALLIDO', "Email inexistente: {$email}, IP: {$ip_origen}");
-
-                $respuesta = Response::advertencia("Credenciales incorrectas");
-                Response::enviar($app, $respuesta, 401);
-                return;
+            // 5. Verificar Credenciales
+            // Si usuario no existe O password incorrecto
+            if (!$usuario || !password_verify($req['password'], $usuario['password_hash'])) {
+                
+                // Registrar fallo y castigar IP
+                $this->repo->registrarIntentoFallido($req['email'], $ip);
+                $this->repo->auditar($usuario['id'] ?? null, 'LOGIN_FALLIDO', $ip);
+                
+                return Response::enviar($app, Response::advertencia("Credenciales incorrectas"), 401);
             }
 
-            // 5. Verificar contraseña
-            if (!password_verify($password, $usuario->password_hash)) {
-                // Contraseña incorrecta
-                $this->authRepository->registrarIntentoFallido($email, $ip_origen);
-                $this->authRepository->registrarAuditoria($usuario->id, 'LOGIN_FALLIDO', "Contraseña incorrecta, IP: {$ip_origen}");
-
-                $respuesta = Response::advertencia("Credenciales incorrectas");
-                Response::enviar($app, $respuesta, 401);
-                return;
+            // 6. Verificar si está activo (Regla de negocio)
+            if ($usuario['activo'] == 0) {
+                return Response::enviar($app, Response::advertencia("Su cuenta ha sido desactivada. Contacte al administrador."), 403);
             }
 
-            // 6. Login exitoso - Limpiar intentos fallidos
-            $this->authRepository->limpiarIntentosLogin($email);
+            // --- LOGIN EXITOSO ---
 
-            // 7. Generar token JWT
-            $datos_usuario = $usuario->aArray();
-            $token = JWTHelper::generarToken($datos_usuario);
+            // 7. Limpiar castigos previos
+            $this->repo->limpiarIntentos($ip);
 
-            // 8. Registrar auditoría
-            $this->authRepository->registrarAuditoria($usuario->id, 'LOGIN_EXITOSO', "IP: {$ip_origen}");
+            // 8. Generar Token
+            $datosUsuario = [
+                'id' => $usuario['id'],
+                'nombre_completo' => $usuario['nombre_completo'],
+                'email' => $usuario['email'],
+                'rol' => $usuario['rol'],
+                'id_sucursal' => $usuario['id_sucursal']
+            ];
 
-            // 9. Preparar respuesta (sin datos sensibles)
-            unset($datos_usuario['password_hash']);
-            unset($datos_usuario['activo']);
-            unset($datos_usuario['creado_en']);
+            $token = JWTHelper::generarToken($datosUsuario);
 
-            $respuesta = Response::exito([
+            // 9. Auditar éxito
+            $this->repo->auditar($usuario['id'], 'LOGIN_EXITOSO', $ip);
+
+            // 10. Responder
+            return Response::enviar($app, Response::exito([
                 'token' => $token,
-                'usuario' => $datos_usuario,
-                'expira_en_segundos' => JWT_DURACION_SEGUNDOS
-            ], "Inicio de sesión exitoso");
-
-            Response::enviar($app, $respuesta, 200);
+                'usuario' => $datosUsuario,
+                'expira_en_segundos' => defined('JWT_DURACION_SEGUNDOS') ? JWT_DURACION_SEGUNDOS : 32400
+            ], "Bienvenido al sistema"));
 
         } catch (\Exception $e) {
-            error_log("Error en login: " . $e->getMessage());
-            $respuesta = Response::error("Error al procesar el inicio de sesión");
-            Response::enviar($app, $respuesta, 500);
+            error_log("Error AuthController::login: " . $e->getMessage());
+            return Response::enviar($app, Response::error("Error interno de autenticación"), 500);
         }
     }
 
     /**
-     * Verifica token JWT (útil para renovación o validación)
-     *
-     * Endpoint: GET /auth/verificar
-     *
-     * @param Slim $app Instancia de Slim
+     * GET /verificar - Verificar Token
      */
     public function verificarToken(Slim $app) {
         try {
-            $datos_usuario = JWTHelper::obtenerUsuarioDesdeToken();
-
-            if (!$datos_usuario) {
-                $respuesta = Response::advertencia("Token inválido o expirado");
-                Response::enviar($app, $respuesta, 401);
-                return;
+            $datos = JWTHelper::obtenerUsuarioDesdeToken();
+            
+            if ($datos) {
+                return Response::enviar($app, Response::exito([
+                    'usuario' => $datos, 
+                    'valido' => true
+                ], "Token activo"));
+            } else {
+                return Response::enviar($app, Response::advertencia("Token inválido o expirado"), 401);
             }
-
-            $respuesta = Response::exito([
-                'usuario' => $datos_usuario,
-                'token_valido' => true
-            ], "Token válido");
-
-            Response::enviar($app, $respuesta, 200);
-
         } catch (\Exception $e) {
-            error_log("Error en verificarToken: " . $e->getMessage());
-            $respuesta = Response::error("Error al verificar el token");
-            Response::enviar($app, $respuesta, 500);
-        }
-    }
-
-    /**
-     * Obtiene la IP real del cliente (considerando proxies)
-     *
-     * @return string IP del cliente
-     */
-    private function obtenerIPCliente() {
-        if (!empty($_SERVER['HTTP_CLIENT_IP'])) {
-            return $_SERVER['HTTP_CLIENT_IP'];
-        } elseif (!empty($_SERVER['HTTP_X_FORWARDED_FOR'])) {
-            return $_SERVER['HTTP_X_FORWARDED_FOR'];
-        } else {
-            return $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0';
+            error_log("Error verificarToken: " . $e->getMessage());
+            return Response::enviar($app, Response::error("Error al verificar token"), 500);
         }
     }
 }

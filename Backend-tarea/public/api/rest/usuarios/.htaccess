@@ -1,0 +1,10 @@
+RewriteEngine On
+# IMPORTANTE: Fíjate que aquí termina en /usuarios/
+RewriteBase /app-tarea/Backend-tarea/public/api/rest/usuarios/
+
+# No reescribir si el archivo o carpeta existe físicamente
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+
+# Mandar todo lo demás a index.php
+RewriteRule ^ index.php [QSA,L]

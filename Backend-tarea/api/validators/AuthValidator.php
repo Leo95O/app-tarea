@@ -3,34 +3,31 @@ namespace Api\Validators;
 
 /**
  * Validador de Autenticación
- *
- * Valida formato y presencia de credenciales.
- * No valida contra la base de datos (esa responsabilidad es del Repository).
+ * Responsabilidad: Integridad de datos antes de procesar lógica.
  */
 class AuthValidator {
 
     /**
-     * Valida las credenciales de login
-     *
-     * @param string $email Email del usuario
-     * @param string $password Contraseña en texto plano
+     * Valida los datos del Login (Sincronizado con AuthController).
+     * * @param array $datos Array con keys 'email' y 'password'
      * @return array ['valido' => bool, 'errores' => array]
      */
-    public static function validarCredenciales($email, $password) {
+    public function validarLogin($datos) {
         $errores = [];
+        
+        $email = $datos['email'] ?? '';
+        $password = $datos['password'] ?? '';
 
-        // Validar email
+        // 1. Validar Email
         if (empty($email)) {
-            $errores[] = "El email es obligatorio";
+            $errores[] = "El correo electrónico es obligatorio";
         } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-            $errores[] = "El formato del email no es válido";
+            $errores[] = "El formato del correo no es válido";
         }
 
-        // Validar contraseña
+        // 2. Validar Contraseña
         if (empty($password)) {
             $errores[] = "La contraseña es obligatoria";
-        } elseif (strlen($password) < 6) {
-            $errores[] = "La contraseña debe tener al menos 6 caracteres";
         }
 
         return [
@@ -40,41 +37,34 @@ class AuthValidator {
     }
 
     /**
-     * Valida los datos para crear un nuevo usuario
-     *
-     * @param array $datos Datos del usuario a validar
-     * @return array ['valido' => bool, 'errores' => array]
+     * Valida la creación de nuevos usuarios (Para el módulo de Usuarios).
      */
-    public static function validarCreacionUsuario($datos) {
+    public function validarCreacionUsuario($datos) {
         $errores = [];
 
-        // Validar nombre completo
+        // Nombre
         if (empty($datos['nombre_completo'])) {
-            $errores[] = "El nombre completo es obligatorio";
+            $errores[] = "El nombre es obligatorio";
         } elseif (strlen($datos['nombre_completo']) < 3) {
-            $errores[] = "El nombre completo debe tener al menos 3 caracteres";
+            $errores[] = "El nombre es muy corto";
         }
 
-        // Validar email
-        if (empty($datos['email'])) {
-            $errores[] = "El email es obligatorio";
-        } elseif (!filter_var($datos['email'], FILTER_VALIDATE_EMAIL)) {
-            $errores[] = "El formato del email no es válido";
+        // Email
+        if (empty($datos['email']) || !filter_var($datos['email'], FILTER_VALIDATE_EMAIL)) {
+            $errores[] = "Email inválido o vacío";
         }
 
-        // Validar contraseña
+        // Password (reglas más estrictas para creación)
         if (empty($datos['password'])) {
             $errores[] = "La contraseña es obligatoria";
-        } elseif (strlen($datos['password']) < 8) {
-            $errores[] = "La contraseña debe tener al menos 8 caracteres";
+        } elseif (strlen($datos['password']) < 6) {
+            $errores[] = "La contraseña debe tener al menos 6 caracteres";
         }
 
-        // Validar rol
+        // Rol
         $roles_validos = ['CEO', 'GG', 'GERENTE', 'COLABORADOR'];
-        if (empty($datos['rol'])) {
-            $errores[] = "El rol es obligatorio";
-        } elseif (!in_array($datos['rol'], $roles_validos)) {
-            $errores[] = "El rol especificado no es válido";
+        if (empty($datos['rol']) || !in_array($datos['rol'], $roles_validos)) {
+            $errores[] = "Rol no válido";
         }
 
         return [

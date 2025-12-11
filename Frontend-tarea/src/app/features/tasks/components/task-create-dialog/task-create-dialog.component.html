@@ -1,0 +1,128 @@
+<div class="flex flex-col h-full max-h-[90vh]">
+  
+  <div class="flex items-center justify-between p-6 border-b border-slate-200 bg-slate-50 rounded-t-xl">
+    <div>
+      <h2 class="text-xl font-bold text-slate-800 m-0">Nueva Tarea</h2>
+      <p class="text-sm text-slate-500 m-0">Define los detalles y asigna responsabilidades.</p>
+    </div>
+    <button mat-icon-button (click)="onCancel()">
+      <mat-icon>close</mat-icon>
+    </button>
+  </div>
+
+  <div class="flex-1 overflow-y-auto p-6">
+    <form [formGroup]="form" class="flex flex-col gap-5">
+
+      <mat-form-field appearance="outline" class="w-full">
+        <mat-label>Título de la Tarea</mat-label>
+        <input matInput formControlName="titulo" placeholder="Ej: Revisión de inventario">
+        <mat-error>El título es requerido (min 3 letras)</mat-error>
+      </mat-form-field>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div class="flex flex-col gap-1">
+          <label class="text-xs font-bold text-slate-500 uppercase ml-1">Inicio</label>
+          <input type="datetime-local" formControlName="fecha_inicio" 
+                 class="w-full px-3 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-slate-700 bg-white transition-all hover:border-slate-400">
+        </div>
+
+        <div class="flex flex-col gap-1">
+          <label class="text-xs font-bold text-slate-500 uppercase ml-1">Vencimiento</label>
+          <input type="datetime-local" formControlName="fecha_fin"
+                 class="w-full px-3 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-slate-700 bg-white transition-all hover:border-slate-400">
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4 items-center bg-slate-50 p-4 rounded-lg border border-slate-200">
+        
+        <div>
+          <mat-slide-toggle formControlName="es_iniciativa_toggle" color="primary">
+            <span class="font-medium text-slate-700 ml-2">Es iniciativa propia</span>
+          </mat-slide-toggle>
+          <p class="text-xs text-slate-500 mt-1 ml-10 leading-tight">
+            Te asignarás esta tarea a ti mismo automáticamente.
+          </p>
+        </div>
+
+        <mat-form-field appearance="outline" class="w-full mt-2 md:mt-0 bg-white">
+          <mat-label>Prioridad</mat-label>
+          <mat-select formControlName="prioridad">
+            <mat-option value="BAJA">
+              <span class="text-slate-600 font-medium">🟢 Baja</span>
+            </mat-option>
+            <mat-option value="MEDIA">
+              <span class="text-blue-600 font-medium">🔵 Media</span>
+            </mat-option>
+            <mat-option value="ALTA">
+              <span class="text-orange-600 font-medium">🟠 Alta</span>
+            </mat-option>
+            <mat-option value="CRITICA">
+              <span class="text-red-600 font-medium">🔴 Crítica</span>
+            </mat-option>
+          </mat-select>
+        </mat-form-field>
+      </div>
+
+      @if (!isInitiative()) {
+        <div class="animate-fade-in">
+          <mat-form-field appearance="outline" class="w-full">
+            <mat-label>Asignar a</mat-label>
+            <input type="text"
+                   placeholder="Selecciona o escribe el nombre..."
+                   matInput
+                   formControlName="asignado_texto"
+                   [matAutocomplete]="auto"
+                   #trigger="matAutocompleteTrigger" 
+                   (click)="trigger.openPanel()"> <mat-icon matSuffix class="text-slate-400">search</mat-icon>
+            
+            <mat-autocomplete #auto="matAutocomplete" [displayWith]="displayFn" (optionSelected)="onUserSelected($event)" class="min-w-[350px]">
+              
+              @if ((filteredUsers$ | async)?.length === 0) {
+                <mat-option disabled class="text-slate-400 italic text-sm">
+                  No se encontraron usuarios
+                </mat-option>
+              }
+
+              @for (user of filteredUsers$ | async; track user.id) {
+                <mat-option [value]="user" class="!h-auto !py-2 border-b border-slate-50 last:border-0">
+                  <div class="flex items-center gap-3">
+                    <div class="h-8 w-8 rounded-full bg-blue-50 flex items-center justify-center text-xs font-bold text-blue-600 border border-blue-100">
+                      {{ user.nombre_completo.charAt(0) }}
+                    </div>
+                    <div class="flex flex-col leading-tight">
+                      <span class="font-bold text-slate-800 text-sm">{{ user.nombre_completo }}</span>
+                      <span class="text-xs text-slate-500">{{ user.rol }}</span>
+                    </div>
+                  </div>
+                </mat-option>
+              }
+            </mat-autocomplete>
+          </mat-form-field>
+        </div>
+      }
+
+      <mat-form-field appearance="outline" class="w-full">
+        <mat-label>Descripción detallada</mat-label>
+        <textarea matInput formControlName="descripcion" rows="4" placeholder="Detalla los entregables esperados, links o instrucciones específicas..."></textarea>
+      </mat-form-field>
+
+    </form>
+  </div>
+
+  <div class="p-6 border-t border-slate-200 flex justify-end gap-3 bg-white rounded-b-xl">
+    <button mat-button (click)="onCancel()" [disabled]="isSubmitting()" class="text-slate-600">
+      Cancelar
+    </button>
+    <button mat-flat-button color="primary" (click)="onSubmit()" [disabled]="form.invalid || isSubmitting()" class="!px-6 !py-2 !rounded-lg">
+      @if (isSubmitting()) {
+        <div class="flex items-center gap-2">
+          <div class="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full"></div>
+          Guardando...
+        </div>
+      } @else {
+        Crear Tarea
+      }
+    </button>
+  </div>
+
+</div>

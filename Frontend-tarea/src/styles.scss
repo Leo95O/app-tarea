@@ -1,0 +1,55 @@
+/* 1. REGLAS SASS (OBLIGATORIAMENTE PRIMERO) */
+// Sass exige que los @use vayan en la línea 1 antes de cualquier estilo o importación.
+@use '@angular/material' as mat;
+
+/* 2. DIRECTIVAS TAILWIND */
+// Después de los @use, cargamos el motor de Tailwind.
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* 3. CONFIGURACIÓN DEL TEMA (Material 3) */
+html {
+  @include mat.theme((
+    color: (
+      primary: mat.$azure-palette,
+      tertiary: mat.$blue-palette,
+    ),
+    typography: Roboto,
+    density: 0,
+  ));
+}
+
+/* 4. ESTILOS GLOBALES */
+html, body { 
+  height: 100%; 
+}
+
+body {
+  margin: 0;
+  
+  // Forzamos el uso de la fuente Roboto y el color de texto base de Tailwind
+  font-family: Roboto, "Helvetica Neue", sans-serif;
+  @apply text-slate-800;
+
+  // CONFIGURACIÓN DE FONDO CORPORATIVO
+  // Sobrescribimos el fondo por defecto de Material para usar tu 'Slate-50' de Tailwind
+  @apply bg-background;
+}
+
+/* 5. INTEGRACIÓN MATERIAL + TAILWIND (Overrides) */
+
+// Hacemos que las Cards de Material se vean limpias y corporativas usando utilidades de Tailwind
+.mat-mdc-card {
+  @apply bg-white rounded-lg shadow-sm border border-slate-200 !important;
+}
+
+// Títulos estandarizados
+h1, h2, h3 {
+  @apply text-slate-800 font-medium;
+}
+
+// Subtítulos
+.subtitle {
+  @apply text-secondary text-sm;
+}

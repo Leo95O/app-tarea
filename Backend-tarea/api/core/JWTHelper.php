@@ -2,30 +2,24 @@
 namespace Api\Core;
 
 use Firebase\JWT\JWT;
-use Firebase\JWT\Key;
 use Exception;
+// ❌ ELIMINADO: use Firebase\JWT\Key; (No existe en v5)
 
 /**
- * Helper para manejo de JSON Web Tokens (JWT)
- *
- * Encapsula la lógica de generación y verificación de tokens
- * usando la librería Firebase JWT.
+ * Helper para manejo de JWT (Versión Compatible PHP 7.1 / JWT v5.5)
  */
 class JWTHelper {
 
-    /**
-     * Genera un token JWT para un usuario
-     *
-     * @param array $datos_usuario Datos del usuario a incluir en el token
-     * @return string Token JWT firmado
-     */
     public static function generarToken($datos_usuario) {
+        $secret = defined('JWT_SECRET') ? JWT_SECRET : 'secret_dev_fallback';
+        $duracion = defined('JWT_DURACION_SEGUNDOS') ? JWT_DURACION_SEGUNDOS : 32400;
+
         $tiempo_emision = time();
-        $tiempo_expiracion = $tiempo_emision + JWT_DURACION_SEGUNDOS;
+        $tiempo_expiracion = $tiempo_emision + $duracion;
 
         $payload = [
-            'iat' => $tiempo_emision,                    // Tiempo de emisión (issued at)
-            'exp' => $tiempo_expiracion,                 // Tiempo de expiración
+            'iat' => $tiempo_emision,
+            'exp' => $tiempo_expiracion,
             'data' => [
                 'id' => $datos_usuario['id'],
                 'email' => $datos_usuario['email'],
@@ -35,66 +29,52 @@ class JWTHelper {
             ]
         ];
 
-        return JWT::encode($payload, JWT_SECRET, 'HS256');
+        // ✅ SINTAXIS V5: Algoritmo como 3er parámetro string (sin objeto Key)
+        return JWT::encode($payload, $secret, 'HS256');
     }
 
-    /**
-     * Verifica y decodifica un token JWT
-     *
-     * @param string $token Token a verificar
-     * @return object|null Datos decodificados del token o null si es inválido
-     */
     public static function verificarToken($token) {
+        $secret = defined('JWT_SECRET') ? JWT_SECRET : 'secret_dev_fallback';
+        
         try {
-            $decoded = JWT::decode($token, new Key(JWT_SECRET, 'HS256'));
+            // ✅ SINTAXIS V5: El tercer parámetro es un ARRAY de algoritmos
+            // JWT::decode(string $jwt, string|resource $key, array $allowed_algs)
+            $decoded = JWT::decode($token, $secret, ['HS256']);
             return $decoded;
-
         } catch (Exception $e) {
-            error_log("Error al verificar token: " . $e->getMessage());
             return null;
         }
     }
 
-    /**
-     * Extrae el token del header Authorization
-     *
-     * Formato esperado: "Authorization: Bearer <TOKEN>"
-     *
-     * @return string|null Token extraído o null si no existe
-     */
     public static function extraerTokenDeHeader() {
-        $headers = getallheaders();
-
-        // Buscar el header Authorization (insensible a mayúsculas)
-        foreach ($headers as $nombre => $valor) {
-            if (strtolower($nombre) === 'authorization') {
-                // Formato: "Bearer <TOKEN>"
-                if (preg_match('/Bearer\s+(.*)$/i', $valor, $matches)) {
-                    return $matches[1];
-                }
+        $headers = null;
+        
+        if (isset($_SERVER['Authorization'])) {
+            $headers = trim($_SERVER["Authorization"]);
+        } else if (isset($_SERVER['HTTP_AUTHORIZATION'])) {
+            $headers = trim($_SERVER["HTTP_AUTHORIZATION"]);
+        } elseif (function_exists('apache_request_headers')) {
+            $requestHeaders = apache_request_headers();
+            $requestHeaders = array_combine(array_map('ucwords', array_keys($requestHeaders)), array_values($requestHeaders));
+            if (isset($requestHeaders['Authorization'])) {
+                $headers = trim($requestHeaders['Authorization']);
             }
         }
 
+        if (!empty($headers)) {
+            if (preg_match('/Bearer\s(\S+)/', $headers, $matches)) {
+                return $matches[1];
+            }
+        }
         return null;
     }
 
-    /**
-     * Obtiene los datos del usuario desde el token en el header
-     *
-     * @return array|null Datos del usuario o null si el token es inválido
-     */
     public static function obtenerUsuarioDesdeToken() {
         $token = self::extraerTokenDeHeader();
-
-        if (!$token) {
-            return null;
-        }
+        if (!$token) return null;
 
         $decoded = self::verificarToken($token);
-
-        if (!$decoded || !isset($decoded->data)) {
-            return null;
-        }
+        if (!$decoded || !isset($decoded->data)) return null;
 
         return (array) $decoded->data;
     }

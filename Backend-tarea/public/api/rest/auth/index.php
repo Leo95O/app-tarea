@@ -1,15 +1,9 @@
 <?php
 /**
- * Entry Point: Módulo de Autenticación
- *
- * Endpoints disponibles:
- * - POST /auth/login         -> Iniciar sesión
- * - GET  /auth/verificar     -> Verificar token JWT
- *
- * Base URL: http://localhost/backend-tarea/public/api/rest/auth/
+ * Entry Point: Autenticación
+ * Ubicación: public/api/rest/auth/index.php
  */
 
-// Cargar configuración y autoloader
 require_once __DIR__ . '/../../../../vendor/autoload.php';
 require_once __DIR__ . '/../../../../config.php';
 
@@ -17,86 +11,44 @@ use Api\Core\AppHelper;
 use Api\Controllers\AuthController;
 use Slim\Slim;
 
-// Configurar zona horaria
-date_default_timezone_set(TIMEZONE_DEFECTO);
+date_default_timezone_set('UTC');
 
-// Crear instancia de Slim
 $app = new Slim();
-
-// Configurar hooks globales (CORS + Error Handler)
+// Configurar CORS y Manejo de Errores
 AppHelper::configurarHooks($app);
 
-// Verificar estructura de carpetas
-AppHelper::verificarEstructuraCarpetas();
-
-// Instanciar controlador
-$authController = new AuthController();
-
-// ============================================================================
-// RUTAS PÚBLICAS (No requieren autenticación)
-// ============================================================================
+// --- RUTAS ---
 
 /**
- * POST /login
- *
- * Inicia sesión y retorna token JWT
- *
- * Request Body:
- * {
- *   "email": "ceo@restaurant.com",
- *   "password": "Admin123!"
- * }
- *
- * Response (Éxito - 200):
- * {
- *   "tipo": 1,
- *   "mensajes": ["Inicio de sesión exitoso"],
- *   "data": {
- *     "token": "eyJ0eXAiOiJKV1Q...",
- *     "usuario": { ... },
- *     "expira_en_segundos": 32400
- *   }
- * }
- *
- * Response (Error - 401):
- * {
- *   "tipo": 2,
- *   "mensajes": ["Credenciales incorrectas"],
- *   "data": {}
- * }
+ * POST /
+ * Iniciar Sesión
  */
-$app->post('/login', function() use ($app, $authController) {
-    $authController->login($app);
+$app->post('/', function() use ($app) {
+    // CORRECCIÓN: Instanciamos DENTRO de la ruta.
+    // Si falla la BD aquí, el AppHelper atrapará el error y responderá bonito.
+    $controller = new AuthController(); 
+    $controller->login($app);
 });
 
 /**
  * GET /verificar
- *
- * Verifica si un token JWT es válido
- *
- * Headers:
- * Authorization: Bearer <TOKEN>
- *
- * Response (Éxito - 200):
- * {
- *   "tipo": 1,
- *   "mensajes": ["Token válido"],
- *   "data": {
- *     "usuario": { ... },
- *     "token_valido": true
- *   }
- * }
- *
- * Response (Error - 401):
- * {
- *   "tipo": 2,
- *   "mensajes": ["Token inválido o expirado"],
- *   "data": {}
- * }
  */
-$app->get('/verificar', function() use ($app, $authController) {
-    $authController->verificarToken($app);
+$app->get('/verificar', function() use ($app) {
+    $controller = new AuthController();
+    $controller->verificarToken($app);
 });
 
-// Ejecutar aplicación
+/**
+ * OPTIONS /
+ * Vital para el Preflight de CORS (Angular pregunta "¿Puedo entrar?" aquí)
+ */
+$app->options('/', function() use ($app) {
+    // Solo devolvemos 200 OK. Los headers CORS los pone el AppHelper automáticamente.
+    $app->response()->status(200);
+});
+
+$app->notFound(function() use ($app) {
+    $app->halt(404, json_encode(['tipo'=>3, 'mensajes'=>['Ruta Auth no encontrada'], 'data'=>[]]));
+});
+
 $app->run();

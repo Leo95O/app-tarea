@@ -1,0 +1,20 @@
+/* Ajustes finos para el modal */
+:host {
+  display: block;
+}
+
+/* Animación suave para mostrar/ocultar campos */
+.animate-fade-in {
+  animation: fadeIn 0.3s ease-in-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-5px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Forzar que el input de fecha nativo se vea como Material */
+input[type="datetime-local"] {
+  font-family: Roboto, sans-serif;
+  color: #334155; /* Slate-700 */
+}

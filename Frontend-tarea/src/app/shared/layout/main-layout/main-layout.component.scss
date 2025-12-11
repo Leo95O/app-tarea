@@ -1,0 +1,9 @@
+:host {
+  display: block;
+  height: 100vh; // Ocupar toda la pantalla
+}
+
+// Ajuste fino para la toolbar de material
+.mat-toolbar {
+  height: 64px;
+}

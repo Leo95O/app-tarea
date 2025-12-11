@@ -4,103 +4,64 @@ namespace Api\Core;
 use Slim\Slim;
 
 /**
- * Helper de Inicialización de la Aplicación
- *
- * Configura comportamientos globales:
- * - Cabeceras CORS para consumo desde Angular
- * - Manejo centralizado de errores fatales
- * - Logging de excepciones
+ * Helper de Inicialización Global
  */
 class AppHelper {
 
-    /**
-     * Configura Hooks de Slim (CORS + Error Handling)
-     *
-     * @param Slim $app Instancia de Slim Framework
-     */
     public static function configurarHooks(Slim $app) {
+        
+        $origen = defined('CORS_ORIGIN') ? CORS_ORIGIN : '*';
 
-        // Hook: Inyectar cabeceras CORS en cada respuesta
-        $app->hook('slim.before.dispatch', function() use ($app) {
-            $app->response()->header('Access-Control-Allow-Origin', CORS_ORIGIN);
+        // Hook CORS
+        $app->hook('slim.before.dispatch', function() use ($app, $origen) {
+            $app->response()->header('Access-Control-Allow-Origin', $origen);
             $app->response()->header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-            $app->response()->header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+            $app->response()->header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-API-Key');
             $app->response()->header('Access-Control-Max-Age', '3600');
         });
 
-        // Manejo de preflight OPTIONS (CORS)
-        $app->options('/:x+', function() use ($app) {
+        // Preflight OPTIONS
+        $app->options('/(:x+)', function() use ($app) {
             $app->response()->status(200);
         });
 
-        // Manejador Global de Errores
-        $app->error(function(\Exception $excepcion) use ($app) {
-            self::manejarErrorGlobal($app, $excepcion);
+        // Global Error Handler
+        $app->error(function(\Exception $e) use ($app) {
+            self::manejarErrorGlobal($app, $e);
         });
     }
 
-    /**
-     * Manejador de Errores Fatales
-     *
-     * Captura excepciones no controladas, las registra en log y retorna
-     * JSON Tipo 3 al cliente sin exponer detalles internos.
-     *
-     * @param Slim $app Instancia de Slim
-     * @param \Exception $excepcion Excepción capturada
-     */
     private static function manejarErrorGlobal(Slim $app, \Exception $excepcion) {
-
-        // Construir mensaje de log detallado
         $timestamp = date('Y-m-d H:i:s');
-        $archivo = $excepcion->getFile();
-        $linea = $excepcion->getLine();
-        $mensaje = $excepcion->getMessage();
-        $traza = $excepcion->getTraceAsString();
-
-        $logMensaje = sprintf(
-            "[%s] ERROR FATAL\nArchivo: %s:%d\nMensaje: %s\nStack Trace:\n%s\n%s\n",
-            $timestamp,
-            $archivo,
-            $linea,
-            $mensaje,
-            $traza,
-            str_repeat('-', 80)
+        $logMsg = sprintf(
+            "[%s] FATAL: %s en %s:%d\nStack: %s\n%s\n",
+            $timestamp, $excepcion->getMessage(), $excepcion->getFile(), 
+            $excepcion->getLine(), $excepcion->getTraceAsString(), str_repeat('-', 60)
         );
 
-        // Escribir en archivo de log
-        $archivoLog = RUTA_LOGS . 'error.log';
-        error_log($logMensaje, 3, $archivoLog);
+        // Definir ruta de logs segura
+        $ruta_logs = defined('RUTA_LOGS') ? RUTA_LOGS : __DIR__ . '/../../logs/';
+        if (is_dir($ruta_logs)) {
+            error_log($logMsg, 3, $ruta_logs . 'error.log');
+        } else {
+            // Fallback si la carpeta no existe
+            error_log($logMsg); 
+        }
 
-        // Responder al cliente con JSON Tipo 3
-        $datosDebug = MODO_DEBUG ? [
-            'archivo' => $archivo,
-            'linea' => $linea,
-            'mensaje_tecnico' => $mensaje
+        $debug = defined('MODO_DEBUG') && MODO_DEBUG ? [
+            'file' => $excepcion->getFile(),
+            'line' => $excepcion->getLine(),
+            'trace' => $excepcion->getMessage()
         ] : [];
 
-        $respuesta = Response::error(
-            "Ha ocurrido un error inesperado. Por favor, contacte al administrador.",
-            $datosDebug
-        );
-
+        $respuesta = Response::error("Error interno del servidor.", $debug);
         Response::enviar($app, $respuesta, 500);
     }
 
-    /**
-     * Verifica que las carpetas críticas existen
-     *
-     * Crea las carpetas de logs y uploads si no existen.
-     */
     public static function verificarEstructuraCarpetas() {
-        $carpetas = [
-            RUTA_LOGS,
-            RUTA_UPLOADS
-        ];
-
-        foreach ($carpetas as $carpeta) {
-            if (!is_dir($carpeta)) {
-                mkdir($carpeta, 0755, true);
-            }
+        $ruta_logs = defined('RUTA_LOGS') ? RUTA_LOGS : __DIR__ . '/../../logs/';
+        if (!is_dir($ruta_logs)) {
+            @mkdir($ruta_logs, 0755, true);
         }
     }
 }
