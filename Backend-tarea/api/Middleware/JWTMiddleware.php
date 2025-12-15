@@ -1,8 +1,8 @@
 <?php
-namespace Api\Middlewares; // <--- CORRECCIÓN DE NAMESPACE
+namespace Api\Middlewares; 
 
 use Api\Core\Response;
-use Api\Core\JWTHelper; // Necesitaremos crear este helper abajo
+use Api\Core\JWTHelper; 
 use Slim\Slim;
 
 class JWTMiddleware {
@@ -13,6 +13,7 @@ class JWTMiddleware {
         try {
             $token = JWTHelper::extraerTokenDeHeader();
 
+            
             if (!$token) {
                 Response::enviar($app, Response::advertencia("Token requerido"), 401);
                 $app->stop();
