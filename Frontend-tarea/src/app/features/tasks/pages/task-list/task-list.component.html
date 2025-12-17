@@ -1,6 +1,6 @@
 <div class="container mx-auto p-6 max-w-7xl">
 
-  <header class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+  <header class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
     <div>
       <h1 class="text-2xl font-bold text-slate-800 m-0">Mis Tareas</h1>
       <p class="text-slate-500 text-sm mt-1">
@@ -9,9 +9,12 @@
     </div>
 
     <div class="flex gap-3">
-      <button mat-stroked-button class="!border-slate-300 !text-slate-600">
-        <mat-icon>filter_list</mat-icon>
-        Filtros
+      <button mat-stroked-button 
+              [class.!bg-slate-100]="mostrarFiltros"
+              class="!border-slate-300 !text-slate-600" 
+              (click)="toggleFiltros()">
+        <mat-icon>{{ mostrarFiltros ? 'filter_list_off' : 'filter_list' }}</mat-icon>
+        {{ mostrarFiltros ? 'Ocultar Filtros' : 'Filtros' }}
       </button>
       
       <button mat-flat-button color="primary" class="!rounded-lg !py-2" (click)="openCreateDialog()">
@@ -20,6 +23,52 @@
       </button>
     </div>
   </header>
+
+  @if (mostrarFiltros) {
+    <div class="bg-slate-50 border border-slate-200 rounded-lg p-4 mb-6 grid grid-cols-1 md:grid-cols-4 gap-4 items-center animate-fade-in">
+      
+      @if (authService.currentUser()?.id_sucursal === null) {
+        <mat-form-field appearance="outline" class="w-full bg-white rounded-md">
+          <mat-label>Filtrar por Sucursal</mat-label>
+          <mat-select [(ngModel)]="filtros.id_sucursal" (selectionChange)="cargarTareas()">
+            <mat-option [value]="null">-- Todas las Sucursales --</mat-option>
+            @for (sucursal of listaSucursales(); track sucursal.id) {
+              <mat-option [value]="sucursal.id">{{ sucursal.nombre }}</mat-option>
+            }
+          </mat-select>
+        </mat-form-field>
+      }
+
+      <mat-form-field appearance="outline" class="w-full bg-white rounded-md">
+        <mat-label>Estado</mat-label>
+        <mat-select [(ngModel)]="filtros.estado" (selectionChange)="cargarTareas()">
+          <mat-option value="">Todos</mat-option>
+          <mat-option value="EN_PROGRESO">En Progreso</mat-option>
+          <mat-option value="PROGRAMADA">Programada</mat-option>
+          <mat-option value="VENCIDA">Vencida</mat-option>
+          <mat-option value="COMPLETADA">Completada / Revisión</mat-option>
+        </mat-select>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline" class="w-full bg-white rounded-md">
+        <mat-label>Prioridad</mat-label>
+        <mat-select [(ngModel)]="filtros.prioridad" (selectionChange)="cargarTareas()">
+          <mat-option value="">Todas</mat-option>
+          <mat-option value="BAJA">Baja</mat-option>
+          <mat-option value="MEDIA">Media</mat-option>
+          <mat-option value="ALTA">Alta</mat-option>
+          <mat-option value="CRITICA">Crítica</mat-option>
+        </mat-select>
+      </mat-form-field>
+
+      <div class="flex justify-end md:justify-start">
+        <button mat-button color="warn" (click)="limpiarFiltros()">
+          <mat-icon>backspace</mat-icon>
+          Limpiar
+        </button>
+      </div>
+    </div>
+  }
 
   @if (isLoading()) {
     <div class="flex flex-col items-center justify-center py-20">
@@ -65,7 +114,7 @@
                 </span>
                 
                 @if (task.estado_ejecucion === 'COMPLETADA' && task.estado_validacion === 'POR_VALIDAR') {
-                  Revisión
+                  Revisión ({{ task.fecha_fin_real | date:'dd/MM' }})
                 } @else {
                   {{ task.estado_ejecucion | titlecase }}
                 }
@@ -103,8 +152,15 @@
             <th mat-header-cell *matHeaderCellDef mat-sort-header class="!font-bold !text-slate-700">Vence</th>
             <td mat-cell *matCellDef="let task">
               <div class="flex items-center gap-1.5">
-                <mat-icon class="!w-4 !h-4 !text-[16px] text-slate-400">event</mat-icon>
-                <span class="text-sm text-slate-600">
+                <mat-icon class="!w-4 !h-4 !text-[16px]" 
+                          [class.text-red-500]="task.estado_ejecucion === 'VENCIDA'"
+                          [class.text-slate-400]="task.estado_ejecucion !== 'VENCIDA'">
+                  event
+                </mat-icon>
+                <span class="text-sm" 
+                      [class.text-red-600]="task.estado_ejecucion === 'VENCIDA'"
+                      [class.text-slate-600]="task.estado_ejecucion !== 'VENCIDA'"
+                      [class.font-bold]="task.estado_ejecucion === 'VENCIDA'">
                   {{ task.fecha_fin_actual | date:'dd MMM, HH:mm' }}
                 </span>
               </div>
@@ -148,7 +204,7 @@
                   <span>Ver Detalle</span>
                 </button>
                 
-                @if (task.estado_validacion !== 'VALIDADA') {
+                @if (task.estado_validacion !== 'VALIDADA' && task.estado_validacion !== 'POR_VALIDAR') {
                   <button mat-menu-item>
                     <mat-icon>edit</mat-icon>
                     <span>Editar</span>
@@ -181,11 +237,19 @@
       <div class="h-16 w-16 bg-slate-50 rounded-full flex items-center justify-center mb-4">
         <mat-icon class="!w-8 !h-8 !text-[32px] text-slate-400">assignment_turned_in</mat-icon>
       </div>
-      <h3 class="text-lg font-medium text-slate-700">No tienes tareas pendientes</h3>
+      <h3 class="text-lg font-medium text-slate-700">No se encontraron tareas</h3>
       <p class="text-slate-400 text-sm mb-6 max-w-xs text-center">
-        ¡Excelente trabajo! Todo está al día. Puedes crear una nueva iniciativa o tomar un descanso.
+        @if (filtros.estado || filtros.id_sucursal || filtros.prioridad) {
+          Prueba cambiando los filtros para ver más resultados.
+        } @else {
+          ¡Todo está al día! Puedes crear una nueva iniciativa.
+        }
       </p>
-      <button mat-stroked-button color="primary" (click)="openCreateDialog()">Crear Iniciativa</button>
+      @if (filtros.estado || filtros.id_sucursal || filtros.prioridad) {
+        <button mat-stroked-button color="warn" (click)="limpiarFiltros()">Borrar Filtros</button>
+      } @else {
+        <button mat-stroked-button color="primary" (click)="openCreateDialog()">Crear Iniciativa</button>
+      }
     </div>
   }
 

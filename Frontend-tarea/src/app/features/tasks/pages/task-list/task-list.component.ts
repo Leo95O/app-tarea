@@ -1,7 +1,6 @@
-import { Component, inject, OnInit } from '@angular/core';
+import { Component, inject, OnInit, signal } from '@angular/core';
 import { CommonModule, DatePipe } from '@angular/common';
-
-// Material Modules
+import { FormsModule } from '@angular/forms'; 
 import { MatTableModule } from '@angular/material/table';
 import { MatPaginatorModule } from '@angular/material/paginator';
 import { MatSortModule } from '@angular/material/sort';
@@ -13,9 +12,12 @@ import { MatMenuModule } from '@angular/material/menu';
 import { MatDividerModule } from '@angular/material/divider';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
-
+import { MatFormFieldModule } from '@angular/material/form-field'; 
+import { MatSelectModule } from '@angular/material/select'; 
+import { MatInputModule } from '@angular/material/input';
 import { TaskService } from '../../services/task.service';
 import { AuthService } from '../../../../core/services/auth.service';
+import { SucursalService } from '../../../../core/services/sucursal.service'; 
 import { TaskCreateDialogComponent } from '../../components/task-create-dialog/task-create-dialog.component';
 import { ConfirmationDialogComponent } from '../../../../shared/ui/confirmation-dialog/confirmation-dialog.component';
 import { Task } from '../../../../core/models/task.interface';
@@ -26,6 +28,7 @@ import { Task } from '../../../../core/models/task.interface';
   imports: [
     CommonModule,
     DatePipe,
+    FormsModule, 
     MatTableModule,
     MatPaginatorModule,
     MatSortModule,
@@ -36,30 +39,79 @@ import { Task } from '../../../../core/models/task.interface';
     MatMenuModule,
     MatDividerModule,
     MatDialogModule,
-    MatSnackBarModule
+    MatSnackBarModule,
+    MatFormFieldModule,
+    MatSelectModule,
+    MatInputModule
   ],
   templateUrl: './task-list.component.html',
   styleUrls: ['./task-list.component.scss']
 })
 export class TaskListComponent implements OnInit {
   private taskService = inject(TaskService);
+  private sucursalService = inject(SucursalService); 
   private dialog = inject(MatDialog);
   private snackBar = inject(MatSnackBar);
-  public authService = inject(AuthService); // Público para usarlo en el HTML
+  public authService = inject(AuthService);
 
   displayedColumns: string[] = ['prioridad', 'estado', 'titulo', 'asignado', 'vencimiento', 'acciones'];
   
   tasks = this.taskService.tasks;
   isLoading = this.taskService.isLoading;
 
+  // --- VARIABLES PARA FILTROS ---
+  listaSucursales = signal<any[]>([]); // Para el combo del CEO
+  filtros = {
+    id_sucursal: null as number | null,
+    estado: '',
+    prioridad: ''
+  };
+
+  mostrarFiltros = false; // Toggle para mostrar/ocultar barra
+
   ngOnInit() {
+    this.verificarPermisosYCaragar();
+  }
+
+  verificarPermisosYCaragar() {
+    // Si es CEO (no tiene sucursal fija), cargamos la lista de sucursales
+    if (this.authService.currentUser()?.id_sucursal === null) {
+      this.cargarSucursales();
+    }
     this.cargarTareas();
   }
 
+  cargarSucursales() {
+    this.sucursalService.getAll(true).subscribe({
+      next: (data) => this.listaSucursales.set(data),
+      error: () => this.showSnack('Error cargando sucursales', 'error')
+    });
+  }
+
   cargarTareas() {
-    this.taskService.getAllTasks().subscribe({
+    // Convertimos nulls a undefined para limpiar la URL
+    const filtrosApi = {
+      id_sucursal: this.filtros.id_sucursal || undefined,
+      estado: this.filtros.estado || undefined,
+      prioridad: this.filtros.prioridad || undefined
+    };
+
+    this.taskService.getAllTasks(filtrosApi).subscribe({
       error: (err) => console.error('Error cargando tareas:', err)
     });
+  }
+
+  limpiarFiltros() {
+    this.filtros = {
+      id_sucursal: null,
+      estado: '',
+      prioridad: ''
+    };
+    this.cargarTareas();
+  }
+
+  toggleFiltros() {
+    this.mostrarFiltros = !this.mostrarFiltros;
   }
 
   openCreateDialog() {
@@ -100,9 +152,8 @@ export class TaskListComponent implements OnInit {
     });
   }
 
-  // --- NUEVAS ACCIONES DEL FLUJO V6 ---
+  // --- ACCIONES DEL FLUJO V6 ---
 
-  // 1. Colaborador solicita validación
   onRequestValidation(task: Task) {
     this.taskService.requestValidation(task.id).subscribe({
       next: () => {
@@ -113,7 +164,6 @@ export class TaskListComponent implements OnInit {
     });
   }
 
-  // 2. Jefe aprueba
   onValidate(task: Task) {
     this.taskService.validateTask(task.id).subscribe({
       next: () => {
@@ -124,7 +174,6 @@ export class TaskListComponent implements OnInit {
     });
   }
 
-  // 3. Jefe rechaza
   onReject(task: Task) {
     this.taskService.rejectTask(task.id).subscribe({
       next: () => {
