@@ -16,6 +16,19 @@ class TareaRepository {
 
     // LISTAR
     public function listarPorUsuario($id_usuario, $rol, $id_sucursal, $filtros = []) {
+        try {
+        $sqlUpdate = "UPDATE tareas 
+                      SET estado_ejecucion = 'VENCIDA', 
+                          estado_ciclo_vida = 'FINALIZADA_VENCIDA'
+                      WHERE fecha_fin_actual < NOW() 
+                        AND estado_ejecucion NOT IN ('COMPLETADA', 'VENCIDA')
+                        AND estado_ciclo_vida != 'INACTIVA'";
+        
+        $this->conexion->exec($sqlUpdate); // Ejecuta la actualización silenciosamente
+    } catch (PDOException $e) {
+        // Ignoramos errores aquí para no detener el listado por un problema de update
+        error_log("Error actualizando vencimientos: " . $e->getMessage());
+    }        
         // SQL Base
         $sql = "SELECT t.*, 
                        c.nombre_completo as nombre_creador, 
