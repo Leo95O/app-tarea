@@ -8,3 +8,9 @@ export interface User {
   email: string;
   activo: boolean;
 }
+export interface UserBasic {
+  id: number;
+  nombre_completo: string;
+  rol: string;
+  id_sucursal: number;
+}
