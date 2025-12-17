@@ -52,7 +52,7 @@ CREATE TABLE `auditoria_auth` (
   `creado_en` datetime DEFAULT current_timestamp(),
   PRIMARY KEY (`id`),
   KEY `idx_usuario_evento` (`id_usuario`,`evento`)
-) ENGINE=InnoDB AUTO_INCREMENT=12 DEFAULT CHARSET=utf8mb4 COMMENT='Registro de eventos de seguridad';
+) ENGINE=InnoDB AUTO_INCREMENT=43 DEFAULT CHARSET=utf8mb4 COMMENT='Registro de eventos de seguridad';
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -116,7 +116,7 @@ CREATE TABLE `intentos_login` (
   `fecha_intento` datetime DEFAULT current_timestamp(),
   PRIMARY KEY (`id`),
   KEY `idx_email_fecha` (`email`,`fecha_intento`)
-) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COMMENT='Prevención de fuerza bruta (3 intentos/2min)';
+) ENGINE=InnoDB AUTO_INCREMENT=14 DEFAULT CHARSET=utf8mb4 COMMENT='Prevención de fuerza bruta (3 intentos/2min)';
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -138,7 +138,7 @@ CREATE TABLE `subtareas` (
   KEY `idx_tarea_completada` (`id_tarea`,`completada`),
   CONSTRAINT `subtareas_ibfk_1` FOREIGN KEY (`id_tarea`) REFERENCES `tareas` (`id`) ON DELETE CASCADE,
   CONSTRAINT `subtareas_ibfk_2` FOREIGN KEY (`id_creador`) REFERENCES `usuarios` (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+) ENGINE=InnoDB AUTO_INCREMENT=9 DEFAULT CHARSET=utf8mb4;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -183,7 +183,7 @@ CREATE TABLE `tareas` (
   `fecha_fin_actual` datetime NOT NULL COMMENT 'Fecha real tras extensiones',
   `fecha_validacion` datetime DEFAULT NULL COMMENT 'Timestamp de aprobación final',
   `estado_ejecucion` enum('PROGRAMADA','EN_PROGRESO','COMPLETADA','VENCIDA') DEFAULT 'PROGRAMADA',
-  `estado_ciclo_vida` enum('ABIERTA','VALIDADA','FINALIZADA_VENCIDA','INACTIVA') DEFAULT 'ABIERTA',
+  `estado_ciclo_vida` varchar(20) NOT NULL DEFAULT 'ACTIVA',
   `estado_validacion` enum('SIN_VALIDAR','POR_VALIDAR','VALIDADA') DEFAULT 'SIN_VALIDAR',
   `contador_extensiones` tinyint(3) unsigned DEFAULT 0 COMMENT 'Máximo 3',
   `contador_rechazos` tinyint(3) unsigned DEFAULT 0 COMMENT 'Para KPI de Calidad',
@@ -202,7 +202,7 @@ CREATE TABLE `tareas` (
   CONSTRAINT `tareas_ibfk_2` FOREIGN KEY (`id_creador`) REFERENCES `usuarios` (`id`),
   CONSTRAINT `tareas_ibfk_3` FOREIGN KEY (`id_asignado`) REFERENCES `usuarios` (`id`) ON DELETE SET NULL,
   CONSTRAINT `tareas_ibfk_4` FOREIGN KEY (`id_validador`) REFERENCES `usuarios` (`id`) ON DELETE SET NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='Tabla central con estados y contadores para BI';
+) ENGINE=InnoDB AUTO_INCREMENT=9 DEFAULT CHARSET=utf8mb4 COMMENT='Tabla central con estados y contadores para BI';
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -241,4 +241,4 @@ CREATE TABLE `usuarios` (
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2025-12-10 12:36:01
+-- Dump completed on 2025-12-17  9:34:46
